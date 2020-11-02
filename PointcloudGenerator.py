@@ -1,45 +1,43 @@
 import numpy as np
 import cv2 as cv
+from imageio import imread
 import open3d as o3d
 
+def lerp(x, x1, x2, y1, y2):
+    # Figure out how 'wide' each range is
+    x_span = x2 - x1
+    y_span = y2 - y1
 
-def pcl_from_images(rgb_image, depth_image, camera_matrix):
+    # Convert the left range into a 0-1 range (float)
+    scaled = (x - x1) / x_span
+
+    # Convert the 0-1 range into a value in the right range.
+    return y1 + (scaled * y_span)
+
+def pcl_from_images(depth_image, camera_matrix):
+    fov = np.deg2rad(33.39849)
+    near = 1.0
+    far = 3.0
     pcl = []
-    shape = np.shape(rgb_image)
-    for row in range(0, shape[0]):
-        for col in range(0, shape[1]):
-            world_coords = depth_image[row, col] * (np.matmul(camera_matrix, np.array([row, col, 1]).reshape(3, 1)))
+    depth_image = depth_image[:, :, 0] / 255.0
+    depth_image = lerp(depth_image, 0.0, 1.0, 0.0, far)
+    rows, cols = np.shape(depth_image)
+    for row in range(rows):
+        for col in range(cols):
+            world_coords = depth_image[row, col] * np.dot(camera_matrix, np.array([row, col, 1]).reshape(3, 1))
             pcl.append(world_coords)
     pcl = np.array(pcl).reshape(len(pcl), 3)
-    # print(pcl)
+    print(pcl)
     return pcl
-def pcl_from_open3d(color_image, depth_image, camera_matrix):
-    color = o3d.Image(color_image.astype(np.uint8))
-    depth = o3d.Image(depth_image.astype(np.uint8))
-    intrinsics = o3d.camera.PinholeCameraIntrinsic()
-    intrinsics.intrinsic_matrix = camera_matrix
-    rgbd = o3d.create_rgbd_image_from_color_and_depth(color, depth, convert_rgb_to_intensity=False)
-    pcd = o3d.create_point_cloud_from_rgbd_image(image=rgbd, intrinsic=intrinsics)
-    pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
-    o3d.draw_geometries([pcd])
-
-
-
-
 
 def main():
+
     f_depth_x = 1.0580353759137747e+03
     f_depth_y = 1.0604471766882732e+03
     c_depth_x = 9.5177505245974123e+02
     c_depth_y = 5.4839653660364445e+02
-    img1_greyscale = cv.imread('RGB/1161.png', 0)
-    img2_greyscale = cv.imread('RGB/1162.png', 0)
-    img1_RGB = cv.imread('RGB/1161.png')
-    img1_RGB = cv.cvtColor(img1_RGB, cv.COLOR_BGR2RGB)
-    img2_RGB = cv.imread('RGB/1162.png')
-    img2_RGB = cv.cvtColor(img1_RGB, cv.COLOR_BGR2RGB)
-    img1_depth = cv.imread('Depth/1161.png', 0)
-    img2_depth = cv.imread('Depth/1162.png', 0)
+    depth_path1 = 'Depth/871.png'
+    img1_depth = np.array(imread(depth_path1))
     camera_matrix = np.array(
         [1 / f_depth_x, 0., -c_depth_x / f_depth_x,
          0., 1 / f_depth_y, -c_depth_y / f_depth_y,
@@ -48,13 +46,11 @@ def main():
         [f_depth_x, 0., c_depth_x,
          0., f_depth_y, c_depth_y,
          0., 0., 1.]).reshape(3, 3)
-    # pcl1 = pcl_from_images(img1_greyscale, img1_depth, camera_matrix)
-    # print(pcl1)
-    # pcl2 = pcl_from_images(img2_greyscale, img2_depth, camera_matrix)
-    # point_cloud = o3d.PointCloud()
-    # point_cloud.points = o3d.Vector3dVector(pcl1)
-    # o3d.draw_geometries([point_cloud])
-    pcl_from_open3d(img1_RGB, img1_depth, camera_matrix)
+    pcl1 = pcl_from_images(img1_depth, camera_matrix)
+    point_cloud = o3d.PointCloud()
+    point_cloud.points = o3d.Vector3dVector(pcl1)
+    o3d.write_point_cloud('pcl1.ply', point_cloud)
+
 
 
 if __name__ == '__main__':
