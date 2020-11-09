@@ -24,21 +24,24 @@ def reproject(depth, fov, condition):
     h, w = np.shape(depth)
     fov_x = fov
     fov_y = fov * h / w
+    delta = 0.5
 
     for i in range(h):
         for j in range(w):
             if condition(depth[i, j]):
-                v = -_normalize(i + 0.5, h, fov_x)
-                u = -_normalize(j + 0.5, w, fov_y)
+                v = -_normalize(i + delta, h, fov_x)
+                u = -_normalize(j + delta, w, fov_y)
                 pt = np.array([u, v, 1])
                 pt = pt * depth[i, j]
                 point_cloud.append(pt)
 
     return point_cloud
 
+
 def rotation_matrix_from_quaternion(quaternion):
     r = Rotation.from_quat(quaternion)
     return r.as_matrix()
+
 
 def transform_matrix_vector_quaternion(vector, quaternion):
     rotation_matrix = rotation_matrix_from_quaternion(quaternion)
@@ -47,6 +50,7 @@ def transform_matrix_vector_quaternion(vector, quaternion):
     out = np.hstack((rotation_matrix, translation_vector.reshape(3, 1)))
     out = np.vstack((out, bottom_row))
     return out
+
 
 def to_original_depth(x, near, far):
     return (near / x - far) / (near - far)
@@ -72,36 +76,69 @@ def to_original_depth(x, near, far):
 def inverse_transform_matrix(transform_matrix):
     return np.linalg.inv(transform_matrix)
 
+
+def load_matrix(row0, row1, row2):
+    r0 = np.array(row0)
+    r1 = np.array(row1)
+    r2 = np.array(row2)
+    r3 = np.array([0.0, 0.0, 0.0, 1.0])
+    matrix = np.vstack((r0, r1, r2, r3))
+    print(matrix)
+    return matrix
+
+
 fov = np.deg2rad(53.97213)
-near = 0.5
+near = 0.0
 far = 3.0
-depth_path1 = 'Depth/1562.png'
-depth_path2 = 'Depth/1563.png'
+depth_path1 = 'Depth/2248.png'
+depth_path2 = 'Depth/2249.png'
 image1 = np.array(imread(depth_path1))
 image1 = image1[:, :, 0] / 255.0
-depth1 = lerp(image1, 0.0, 1.0, near, far)
+depth1 = lerp(image1, 0, 1.0, near, far)
 points1 = reproject(depth1, fov, lambda x: x <= 0.99 * far)
-vector1 = [0.9, 0.1, 0.4]
-vector2 = [0.9, -0.1, 0.4]
-quaternion1 = [0.6, -0.6, -0.4, 0.4]
-quaternion2 = [-0.6, 0.6, 0.4, -0.4]
+vector1 = [0.0, -1.0, 0.0]
+vector2 = [0.0, 1.0, 0.0]
+quaternion1 = [0.0, 0.7, 0.7, 0.0]
+quaternion2 = [0.7, 0.0, 0.0, 0.7]
+# 1, 2 - right hand
+matrix1 = np.array([[-0.99965, 0.00107, 0.02660, -0.02660],
+                    [0.02662, 0.04025, 0.99883, -0.99883],
+                    [0.00000, 0.99919, -0.04027, 0.04027],
+                    [0.00000, 0.00000, 0.00000, 1.00000]])
+matrix2 = np.array([[0.99965, 0.00107, 0.02660, -0.02660],
+                    [0.02662, -0.04025, -0.99883, 0.99883],
+                    [0.00000, 0.99919, -0.04027, 0.04027],
+                    [0.00000, 0.00000, 0.00000, 1.00000]])
+# 3, 4 - Unity
+matrix3 = np.array([[0.99965, 0.00107, 0.02660, -0.02660],
+                    [0.00000, 0.99919, -0.04027, 0.04027],
+                    [0.02662, 0.04025, 0.99883, -0.99883],
+                    [0.00000, 0.00000, 0.00000, 1.00000]])
+matrix4 = np.array([[0.99965, 0.00107, 0.02660, -0.02660],
+                    [0.00000, 0.99919, -0.04027, 0.04027],
+                    [0.02662, -0.04025, -0.99883, 0.99883],
+                    [0.00000, 0.00000, 0.00000, 1.00000]])
 pcl1 = o3d.geometry.PointCloud()
 pcl1.points = o3d.utility.Vector3dVector(points1)
-transform_matrix1 = transform_matrix_vector_quaternion(vector2, quaternion2)
-inverse_matrix1 = inverse_transform_matrix(transform_matrix1)
-pcl1.transform(transform_matrix1)
+transform_matrix1 = transform_matrix_vector_quaternion(vector1, quaternion1)
+transform_matrix2 = transform_matrix_vector_quaternion(vector2, quaternion2)
+inverse_matrix1 = inverse_transform_matrix(transform_matrix2)
+pcl1.transform(matrix1)
 o3d.write_point_cloud("pcl1.ply", pcl1)
 image2 = np.array(imread(depth_path2))
 image2 = image2[:, :, 0] / 255.0
-depth2 = lerp(image2, 0.0, 1.0, 0.0, far)
+depth2 = lerp(image2, 0.0, 1.0, near, far)
 points2 = reproject(depth2, fov, lambda x: x <= 0.99 * far)
 pcl2 = o3d.geometry.PointCloud()
 pcl2.points = o3d.utility.Vector3dVector(points2)
-transform_matrix2 = transform_matrix_vector_quaternion(vector2, quaternion2)
 inverse_matrix2 = inverse_transform_matrix(transform_matrix2)
-pcl2.transform(transform_matrix2)
+pcl2.transform(matrix2)
 print(transform_matrix1)
 print("-----------")
+print(matrix1)
+print("-----------")
 print(transform_matrix2)
+print("-----------")
+print(matrix4)
 o3d.write_point_cloud("pcl2.ply", pcl2)
 o3d.visualization.draw_geometries([pcl1, pcl2])
