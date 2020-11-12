@@ -90,9 +90,10 @@ def load_matrix(row0, row1, row2):
 fov = np.deg2rad(53.97213)
 near = 0.0
 far = 3.0
-depth_path1 = 'Depth/2248.png'
-depth_path2 = 'Depth/2249.png'
+depth_path1 = 'Depth/1335.png'
+depth_path2 = 'Depth/1336.png'
 image1 = np.array(imread(depth_path1))
+print(image1)
 image1 = image1[:, :, 0] / 255.0
 depth1 = lerp(image1, 0, 1.0, near, far)
 points1 = reproject(depth1, fov, lambda x: x <= 0.99 * far)
@@ -101,14 +102,23 @@ vector2 = [0.0, 1.0, 0.0]
 quaternion1 = [0.0, 0.7, 0.7, 0.0]
 quaternion2 = [0.7, 0.0, 0.0, 0.7]
 # 1, 2 - right hand
-matrix1 = np.array([[-0.99965, 0.00107, 0.02660, -0.02660],
-                    [0.02662, 0.04025, 0.99883, -0.99883],
-                    [0.00000, 0.99919, -0.04027, 0.04027],
+matrix1 = np.array([[-0.67831, -0.41740, -0.60471, 0.60471],
+                    [-0.73477, 0.38533, 0.55824, -0.55824],
+                    [0.00000, 0.82298, -0.56806, 0.56806],
                     [0.00000, 0.00000, 0.00000, 1.00000]])
-matrix2 = np.array([[0.99965, 0.00107, 0.02660, -0.02660],
-                    [0.02662, -0.04025, -0.99883, 0.99883],
-                    [0.00000, 0.99919, -0.04027, 0.04027],
+
+matrix2 = np.array([[0.75257, -0.37408, -0.54194, 0.54194],
+                    [-0.65851, -0.42751, -0.61935, 0.61935],
+                    [0.00000, 0.82298, -0.56806, 0.56806],
                     [0.00000, 0.00000, 0.00000, 1.00000]])
+# matrix1 = np.array([[-1.0, 0.0, 0.0, 0],
+#                     [0.0, 0.0, 1.0, -1.0],
+#                     [0.00000, 1.0, 0.0, 0.0],
+#                     [0.00000, 0.00000, 0.00000, 1.00000]])
+# matrix2 = np.array([[1.0, 0.0, 0.0, 0.0],
+#                     [0.0, 0.0, -1.0, 1.0],
+#                     [0.00000, 1.0, 0.0, 0.0],
+#                     [0.00000, 0.00000, 0.00000, 1.00000]])
 # 3, 4 - Unity
 matrix3 = np.array([[0.99965, 0.00107, 0.02660, -0.02660],
                     [0.00000, 0.99919, -0.04027, 0.04027],
@@ -133,12 +143,12 @@ pcl2 = o3d.geometry.PointCloud()
 pcl2.points = o3d.utility.Vector3dVector(points2)
 inverse_matrix2 = inverse_transform_matrix(transform_matrix2)
 pcl2.transform(matrix2)
-print(transform_matrix1)
-print("-----------")
-print(matrix1)
-print("-----------")
-print(transform_matrix2)
-print("-----------")
-print(matrix4)
+# print(transform_matrix1)
+# print("-----------")
+# print(matrix1)
+# print("-----------")
+# print(transform_matrix2)
+# print("-----------")
+# print(matrix4)
 o3d.write_point_cloud("pcl2.ply", pcl2)
 o3d.visualization.draw_geometries([pcl1, pcl2])

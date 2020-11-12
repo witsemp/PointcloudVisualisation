@@ -36,8 +36,10 @@ def main():
     f_depth_y = 1.0604471766882732e+03
     c_depth_x = 9.5177505245974123e+02
     c_depth_y = 5.4839653660364445e+02
-    depth_path1 = 'Depth/871.png'
+    depth_path1 = 'Depth/2248.png'
+    depth_path2 = 'Depth/2249.png'
     img1_depth = np.array(imread(depth_path1))
+    img2_depth = np.array(imread(depth_path2))
     camera_matrix = np.array(
         [1 / f_depth_x, 0., -c_depth_x / f_depth_x,
          0., 1 / f_depth_y, -c_depth_y / f_depth_y,
@@ -47,9 +49,12 @@ def main():
          0., f_depth_y, c_depth_y,
          0., 0., 1.]).reshape(3, 3)
     pcl1 = pcl_from_images(img1_depth, camera_matrix)
-    point_cloud = o3d.PointCloud()
-    point_cloud.points = o3d.Vector3dVector(pcl1)
-    o3d.write_point_cloud('pcl1.ply', point_cloud)
+    point_cloud1 = o3d.PointCloud()
+    point_cloud1.points = o3d.Vector3dVector(pcl1)
+    pcl2 = pcl_from_images(img2_depth, camera_matrix)
+    point_cloud2 = o3d.PointCloud()
+    point_cloud2.points = o3d.Vector3dVector(pcl1)
+    o3d.visualization.draw_geometries([point_cloud1, point_cloud2])
 
 
 
