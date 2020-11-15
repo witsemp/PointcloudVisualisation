@@ -3,6 +3,7 @@ import cv2 as cv
 from imageio import imread
 import open3d as o3d
 
+
 def lerp(x, x1, x2, y1, y2):
     # Figure out how 'wide' each range is
     x_span = x2 - x1
@@ -13,6 +14,7 @@ def lerp(x, x1, x2, y1, y2):
 
     # Convert the 0-1 range into a value in the right range.
     return y1 + (scaled * y_span)
+
 
 def pcl_from_images(depth_image, camera_matrix):
     fov = np.deg2rad(33.39849)
@@ -30,8 +32,34 @@ def pcl_from_images(depth_image, camera_matrix):
     print(pcl)
     return pcl
 
-def main():
 
+def reproject(depth, fov, condition):
+    def _normalize(x, dim, f):
+        return (2 * x / dim - 1) * np.tan(f / 2)
+
+    point_cloud = list()
+
+    h, w = np.shape(depth)
+    fov_x = fov
+    fov_y = fov * h / w
+    delta = 0.5
+
+    for i in range(h):
+        for j in range(w):
+            if condition(depth[i, j]):
+                v = -_normalize(i + delta, h, fov_x)
+                u = -_normalize(j + delta, w, fov_y)
+                pt = np.array([u, v, 1])
+                pt = pt * depth[i, j]
+                point_cloud.append(pt)
+
+    return point_cloud
+
+
+def main():
+    fov = np.deg2rad(53.97213)
+    near = 0.0
+    far = 3.0
     f_depth_x = 1.0580353759137747e+03
     f_depth_y = 1.0604471766882732e+03
     c_depth_x = 9.5177505245974123e+02
@@ -48,14 +76,13 @@ def main():
         [f_depth_x, 0., c_depth_x,
          0., f_depth_y, c_depth_y,
          0., 0., 1.]).reshape(3, 3)
-    pcl1 = pcl_from_images(img1_depth, camera_matrix)
+    pcl1 = reproject(img1_depth, fov, lambda x: x <= 0.99 * far)
     point_cloud1 = o3d.PointCloud()
     point_cloud1.points = o3d.Vector3dVector(pcl1)
-    pcl2 = pcl_from_images(img2_depth, camera_matrix)
+    pcl2 = reproject(img2_depth, fov, lambda x: x <= 0.99 * far)
     point_cloud2 = o3d.PointCloud()
     point_cloud2.points = o3d.Vector3dVector(pcl1)
     o3d.visualization.draw_geometries([point_cloud1, point_cloud2])
-
 
 
 if __name__ == '__main__':
