@@ -17,7 +17,7 @@ def lerp(x, x1, x2, y1, y2):
 
 
 def load_depth_image(depth_image_index: int):
-    base_path = 'Depth/'
+    base_path = '/home/witsemp/saved_test/chair/1a74a83fa6d24b3cacd67ce2c72c02e/depth/'
     file_name = str(depth_image_index) + ".png"
     depth_image_path = base_path + file_name
     depth_image = cv.imread(depth_image_path, flags=cv.IMREAD_ANYDEPTH)
@@ -67,14 +67,71 @@ def reproject(depth, fov, condition):
 
 def pcl_from_images(depth_image, camera_matrix):
     pcl = []
-    depth_image = depth_image / 10000.0
     rows, cols = np.shape(depth_image)
     for row in range(rows):
         for col in range(cols):
-            world_coords = depth_image[row, col] * np.dot(camera_matrix, np.array([row, col, 1]).reshape(3, 1))
+            world_coords = depth_image[row, col] * np.dot(camera_matrix, np.array([col, row, 1]).reshape(3, 1))
             pcl.append(world_coords)
     pcl = np.array(pcl).reshape(len(pcl), 3)
     return pcl
+
+
+def reproject_with_camera_matrix(index1, index2, xml_file_path, camera_matrix):
+    div = 10000.0
+    depth_image1 = load_depth_image(index1)
+    depth_image2 = load_depth_image(index2)
+    print("Type:\n", depth_image1.dtype)
+    print("---------")
+    print("Image values:\n", depth_image1)
+    print("---------")
+    depth_image1 = depth_image1 / div
+    depth_image2 = depth_image2 / div
+    print("Scaled to metric:\n", depth_image1)
+    transform_matrix1 = get_transform_matrix(xml_file_path, index1)
+    transform_matrix2 = get_transform_matrix(xml_file_path, index2)
+    inverse_matrix1 = inverse_transform_matrix(transform_matrix1)
+    inverse_matrix2 = inverse_transform_matrix(transform_matrix2)
+    pcl1 = pcl_from_images(depth_image1, camera_matrix)
+    pcl2 = pcl_from_images(depth_image2, camera_matrix)
+    point_cloud1 = o3d.PointCloud()
+    point_cloud2 = o3d.PointCloud()
+    point_cloud1.points = o3d.Vector3dVector(pcl1)
+    point_cloud2.points = o3d.Vector3dVector(pcl2)
+    point_cloud1.transform(transform_matrix1)
+    point_cloud2.transform(transform_matrix1)
+    # point_cloud2.transform(np.dot(transform_matrix1, inverse_matrix2))
+    o3d.visualization.draw_geometries([point_cloud1, point_cloud2])
+
+
+def reproject_with_fov(index1, index2, xml_file_path, fov, near, far, visualise_images=False):
+    div = 10000.0
+    depth_image1 = load_depth_image(index1)
+    depth_image2 = load_depth_image(index2)
+    print("Type:\n", depth_image1.dtype)
+    print("---------")
+    print("Image values:\n", depth_image1)
+    print("---------")
+    depth_image1_metric = depth_image1 / div
+    depth_image2_metric = depth_image2 / div
+    print("Scaled to metric:\n", depth_image1)
+    transform_matrix1 = get_transform_matrix(xml_file_path, index1)
+    transform_matrix2 = get_transform_matrix(xml_file_path, index2)
+    inverse_matrix1 = inverse_transform_matrix(transform_matrix1)
+    inverse_matrix2 = inverse_transform_matrix(transform_matrix2)
+    pcl1 = reproject(depth_image1_metric, fov, lambda x: near <= x <= 0.99 * far)
+    pcl2 = reproject(depth_image2_metric, fov, lambda x: near <= x <= 0.99 * far)
+    point_cloud1 = o3d.PointCloud()
+    point_cloud2 = o3d.PointCloud()
+    point_cloud1.points = o3d.Vector3dVector(pcl1)
+    point_cloud2.points = o3d.Vector3dVector(pcl2)
+    point_cloud1.transform(transform_matrix1)
+    point_cloud2.transform(transform_matrix2)
+    # point_cloud2.transform(np.dot(transform_matrix1, inverse_matrix2))
+    o3d.visualization.draw_geometries([point_cloud1, point_cloud2])
+    if visualise_images:
+        cv.imshow('depth1', depth_image1)
+        cv.imshow('depth2', depth_image2)
+        cv.waitKey(0)
 
 
 if __name__ == '__main__':
@@ -94,32 +151,7 @@ if __name__ == '__main__':
         [f_depth_x, 0., c_depth_x,
          0., f_depth_y, c_depth_y,
          0., 0., 1.]).reshape(3, 3)
-    index1 = 840
-    index2 = 841
-    depth_image1 = load_depth_image(index1)
-    depth_image2 = load_depth_image(index2)
-    print("Type:\n", depth_image1.dtype)
-    print("---------")
-    print("Image values:\n", depth_image1)
-    print("---------")
-    print("Scaled to metric:\n", depth_image1 / 10000.0)
-    depth_image1 = depth_image1 / 10000.0
-    depth_image2 = depth_image2 / 10000.0
-    transform_matrix1 = get_transform_matrix(xml_file_path, index1)
-    transform_matrix2 = get_transform_matrix(xml_file_path, index2)
-    inverse_matrix1 = inverse_transform_matrix(transform_matrix1)
-    inverse_matrix2 = inverse_transform_matrix(transform_matrix2)
-    # pcl1 = pcl_from_images(depth_image1, camera_matrix)
-    # pcl2 = pcl_from_images(depth_image2, camera_matrix)
-    pcl1 = reproject(depth_image1, fov, lambda x: x <= 0.99 * far)
-    pcl2 = reproject(depth_image2, fov, lambda x: x <= 0.99 * far)
-    point_cloud1 = o3d.PointCloud()
-    point_cloud2 = o3d.PointCloud()
-    point_cloud1.points = o3d.Vector3dVector(pcl1)
-    point_cloud2.points = o3d.Vector3dVector(pcl2)
-    point_cloud1.transform(transform_matrix1)
-    point_cloud2.transform(transform_matrix2)
-    o3d.visualization.draw_geometries([point_cloud1, point_cloud2])
-    # cv.imshow('depth1', depth_image1)
-    # cv.imshow('depth2', depth_image2)
-    # cv.waitKey(0)
+    index1 = 2
+    index2 = 3
+    reproject_with_fov(index1, index2, xml_file_path, fov, near, far, visualise_images=True)
+    # reproject_with_camera_matrix(index1, index2, xml_file_path, camera_matrix)
