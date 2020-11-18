@@ -41,6 +41,7 @@ def get_transform_matrix(xml_file_path: str, index: int):
     transform_matrix = np.array([rows[0], rows[1], rows[2], rows[3]])
     return transform_matrix
 
+
 def get_vector_quaternion(xml_file_path: str, index: int):
     rows = []
     root = etree.parse(xml_file_path)
@@ -55,8 +56,10 @@ def get_vector_quaternion(xml_file_path: str, index: int):
     rotation = [float(element) for element in rotation]
     return position, rotation
 
+
 def inverse_transform_matrix(transform_matrix):
     return np.linalg.inv(transform_matrix)
+
 
 def rotation_matrix_from_quaternion(quaternion):
     r = Rotation.from_quat(quaternion)
@@ -102,6 +105,16 @@ def pcl_from_images(depth_image, camera_matrix):
     pcl = np.array(pcl).reshape(len(pcl), 3)
     return pcl
 
+def image_from_pcl(pcl, shape, camera_matrix):
+    reprojected_image = np.zeros(shape)
+    h, w = shape
+    for point in pcl.points:
+        d = point[2]
+        point = point.reshape(3, 1)/d
+        image_coords = np.dot(inverse_transform_matrix(camera_matrix), point)
+        if int(image_coords[0]) < w and int(image_coords[1]) < h:
+            reprojected_image[int(image_coords[1]), int(image_coords[0])] = d*10000
+    return reprojected_image.astype(np.uint16)
 
 def reproject_with_camera_matrix(index1, index2, xml_file_path, camera_matrix, visualise_images=False):
     div = 10000.0
@@ -122,22 +135,26 @@ def reproject_with_camera_matrix(index1, index2, xml_file_path, camera_matrix, v
     print("Scaled to metric:\n", depth_image2_metric)
     transform_matrix1 = get_transform_matrix(xml_file_path, index1)
     transform_matrix2 = get_transform_matrix(xml_file_path, index2)
-    inverse_matrix1 = inverse_transform_matrix(transform_matrix1)
-    inverse_matrix2 = inverse_transform_matrix(transform_matrix2)
-    pos1, rot1 = get_vector_quaternion(xml_file_path, index1)
-    pos2, rot2 = get_vector_quaternion(xml_file_path, index2)
-    transform_matrix1_vq = transform_matrix_vector_quaternion(pos1, rot1)
-    transform_matrix2_vq = transform_matrix_vector_quaternion(pos2, rot2)
-    inverse_matrix1 = inverse_transform_matrix(transform_matrix1)
-    inverse_matrix2 = inverse_transform_matrix(transform_matrix2)
-    inverse_matrix1_vq = inverse_transform_matrix(transform_matrix1_vq)
-    inverse_matrix2_vq = inverse_transform_matrix(transform_matrix2_vq)
+    # inverse_matrix1 = inverse_transform_matrix(transform_matrix1)
+    # inverse_matrix2 = inverse_transform_matrix(transform_matrix2)
+    # pos1, rot1 = get_vector_quaternion(xml_file_path, index1)
+    # pos2, rot2 = get_vector_quaternion(xml_file_path, index2)
+    # transform_matrix1_vq = transform_matrix_vector_quaternion(pos1, rot1)
+    # transform_matrix2_vq = transform_matrix_vector_quaternion(pos2, rot2)
+    # inverse_matrix1 = inverse_transform_matrix(transform_matrix1)
+    # inverse_matrix2 = inverse_transform_matrix(transform_matrix2)
+    # inverse_matrix1_vq = inverse_transform_matrix(transform_matrix1_vq)
+    # inverse_matrix2_vq = inverse_transform_matrix(transform_matrix2_vq)
     pcl1 = pcl_from_images(depth_image1_metric, camera_matrix)
     pcl2 = pcl_from_images(depth_image2_metric, camera_matrix)
     point_cloud1 = o3d.PointCloud()
     point_cloud2 = o3d.PointCloud()
     point_cloud1.points = o3d.Vector3dVector(pcl1)
     point_cloud2.points = o3d.Vector3dVector(pcl2)
+    reprojected = image_from_pcl(point_cloud1, depth_image1.shape, camera_matrix)
+    cv.imshow('reprojected', reprojected)
+    cv.imshow('original', depth_image1)
+    cv.waitKey(0)
     point_cloud1.transform(transform_matrix1)
     point_cloud2.transform(transform_matrix2)
     # point_cloud2.transform(np.dot(inverse_matrix2, transform_matrix1))
