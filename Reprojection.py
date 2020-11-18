@@ -105,16 +105,18 @@ def pcl_from_images(depth_image, camera_matrix):
     pcl = np.array(pcl).reshape(len(pcl), 3)
     return pcl
 
+
 def image_from_pcl(pcl, shape, camera_matrix):
     reprojected_image = np.zeros(shape)
     h, w = shape
     for point in pcl.points:
         d = point[2]
-        point = point.reshape(3, 1)/d
+        point = point.reshape(3, 1) / d
         image_coords = np.dot(inverse_transform_matrix(camera_matrix), point)
         if int(image_coords[0]) < w and int(image_coords[1]) < h:
-            reprojected_image[int(image_coords[1]), int(image_coords[0])] = d*10000
+            reprojected_image[int(image_coords[1]), int(image_coords[0])] = d * 5000
     return reprojected_image.astype(np.uint16)
+
 
 def reproject_with_camera_matrix(index1, index2, xml_file_path, camera_matrix, visualise_images=False):
     div = 10000.0
@@ -151,12 +153,12 @@ def reproject_with_camera_matrix(index1, index2, xml_file_path, camera_matrix, v
     point_cloud2 = o3d.PointCloud()
     point_cloud1.points = o3d.Vector3dVector(pcl1)
     point_cloud2.points = o3d.Vector3dVector(pcl2)
-    reprojected = image_from_pcl(point_cloud1, depth_image1.shape, camera_matrix)
+    reprojected = image_from_pcl(point_cloud2, depth_image2.shape, camera_matrix)
     cv.imshow('reprojected', reprojected)
-    cv.imshow('original', depth_image1)
+    cv.imshow('original', depth_image2)
     cv.waitKey(0)
-    point_cloud1.transform(transform_matrix1)
-    point_cloud2.transform(transform_matrix2)
+    # point_cloud1.transform(transform_matrix1)
+    # point_cloud2.transform(transform_matrix2)
     # point_cloud2.transform(np.dot(inverse_matrix2, transform_matrix1))
     o3d.visualization.draw_geometries([point_cloud1, point_cloud2])
     if visualise_images:
@@ -198,6 +200,37 @@ def reproject_with_fov(index1, index2, xml_file_path, fov, near, far, visualise_
         cv.waitKey(0)
 
 
+def reproject_with_open3d(index1, index2, xml_file_path, camera_matrix_opencv, camera_matrix, visualise_images=False):
+    depth_image1 = load_depth_image(index1)
+    depth_image2 = load_depth_image(index2)
+    transform_matrix1 = get_transform_matrix(xml_file_path, index1)
+    transform_matrix2 = get_transform_matrix(xml_file_path, index2)
+    pcl1 = point_cloud_open3d(index1, xml_file_path, camera_matrix_opencv)
+    pcl2 = point_cloud_open3d(index2, xml_file_path, camera_matrix_opencv)
+    reprojected = image_from_pcl(pcl1, depth_image1.shape, camera_matrix)
+    cv.imshow('reprojected', reprojected)
+    cv.imshow('original', depth_image1)
+    cv.waitKey(0)
+    # point_cloud1.transform(transform_matrix1)
+    # point_cloud2.transform(transform_matrix2)
+    # point_cloud2.transform(np.dot(inverse_matrix2, transform_matrix1))
+    o3d.visualization.draw_geometries([pcl1, pcl2])
+    if visualise_images:
+        cv.imshow('depth1', depth_image1)
+        cv.imshow('depth2', depth_image2)
+        cv.waitKey(0)
+
+
+def point_cloud_open3d(index, xml_file_path, camera_matrix):
+    depth_image = load_depth_image(index)
+    depth_o3d = o3d.Image(depth_image.astype(np.uint16))
+    intrinsics = o3d.camera.PinholeCameraIntrinsic()
+    intrinsics.intrinsic_matrix = camera_matrix
+    pcl = o3d.create_point_cloud_from_depth_image(depth=depth_o3d, intrinsic=intrinsics, depth_scale=5000.0)
+    # pcl.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+    return pcl
+
+
 if __name__ == '__main__':
     xml_file_path = '/home/witsemp/work/UnityObjectRenderer/output.xml'
     # f_depth_x = 1.0580353759137747e+03
@@ -219,8 +252,8 @@ if __name__ == '__main__':
         [[f_depth_x, 0., c_depth_x],
          [0., f_depth_y, c_depth_y],
          [0., 0., 1.]])
-    # 2, 1500 - ok, 1990 - nie ok
-    index1 = 2
+    index1 = 208
     index2 = index1 + 1
     # reproject_with_fov(index1, index2, xml_file_path, fov, near, far, visualise_images=True)
-    reproject_with_camera_matrix(index1, index2, xml_file_path, camera_matrix, visualise_images=False)
+    # reproject_with_camera_matrix(index1, index2, xml_file_path, camera_matrix, visualise_images=False)
+    reproject_with_open3d(index1, index2, xml_file_path, camera_matrix_opencv, camera_matrix)
